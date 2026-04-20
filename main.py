@@ -65,7 +65,10 @@ LOCATIONS = ["TX", "Texas"]
 EMAIL_PATTERN = re.compile(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$')
 
 # noreply email pattern to skip
-NOREPLY_PATTERN = re.compile(r'noreply@github\.com', re.IGNORECASE)
+NOREPLY_PATTERN = re.compile(
+    r'^[^@]+@(?:users\.)?noreply\.github\.com$', 
+    re.IGNORECASE
+)
 
 def github_request(url, params=None, retries=3):
     global LAST_REQUEST_TIME
