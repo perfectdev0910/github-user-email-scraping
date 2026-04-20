@@ -43,7 +43,7 @@ gc = gspread.authorize(creds)
 sheet = gc.open(GOOGLE_SHEET_NAME).sheet1
 
 # GitHub API configuration
-GITHUB_TOKEN = os.getenv("TOKEN")
+GITHUB_TOKEN = os.getenv("G_TOKEN")
 if not GITHUB_TOKEN:
     raise ValueError("GITHUB_TOKEN environment variable is required")
 
