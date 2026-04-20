@@ -34,7 +34,7 @@ SCOPES = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapi
 
 creds_dict = json.loads(os.getenv("GOOGLE_CREDS_JSON"))
 
-creds = Credentials.from_service_account_file(
+creds = Credentials.from_service_account_info(
     creds_dict,
     scopes=SCOPES
 )
