@@ -28,7 +28,9 @@ load_dotenv()
 # Google Sheets config
 GOOGLE_SHEET_NAME = "GitHub Leads"
 LAST_REQUEST_TIME = 0
-REQUEST_INTERVAL = 0.2  # 5 requests/sec safe
+REQUEST_INTERVAL = 0.1  # 5 requests/sec safe
+BATCH_SIZE = 50
+BATCH_ROWS = []
 
 SCOPES = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
 
@@ -105,12 +107,11 @@ def github_request(url, params=None, retries=3):
     return None
 
 def init_google_sheet():
-    headers = ["name", "email", "github_url"]
-
-    existing = sheet.get_all_values()
-    if len(existing) == 0:
-        sheet.append_row(headers)
-
+    try:
+        if not sheet.row_values(1):
+            sheet.append_row(["name", "email", "github_url"])
+    except:
+        sheet.append_row(["name", "email", "github_url"])
 
 def search_users_by_location_and_created(location: str, created_filter: str):
     users = []
@@ -173,7 +174,7 @@ def get_user_public_email(username: str) -> Optional[str]:
     return None
 
 
-def get_user_repositories(username: str, max_repos: int = 100) -> List[Dict]:
+def get_user_repositories(username: str, max_repos: int = 10) -> List[Dict]:
     """Get user's public repositories sorted by latest update first."""
 
     repos = []
@@ -294,13 +295,9 @@ def generate_date_ranges(start_date: str, end_date: str) -> List[str]:
 
 def scrape_user_email(username: str) -> Optional[str]:
     """Scrape email from a user's profile or repositories."""
-    # First try to get public email
-    public_email = get_user_public_email(username)
-    if public_email:
-        return public_email
     
     # If no public email, search through repositories
-    repos = get_user_repositories(username, max_repos=20)
+    repos = get_user_repositories(username, max_repos=10)
     
     for repo in repos:
         owner = repo.get("owner", {}).get("login")
@@ -348,9 +345,10 @@ def process_users_batch(users: List[Dict], processed_usernames: set) -> List[Dic
                     "github_url": github_url
                 }
 
-                append_to_sheet(lead)
+                append_to_sheet_batch(lead)
                 print(f"  Saved to sheet: {email}")
                 print(f"  Found email: {email}")
+            
             
             processed_usernames.add(username)
             
@@ -413,16 +411,31 @@ def get_total_user_count(location: str, created_date: str) -> int:
     
     return data.get("total_count", 0)
 
-def append_to_sheet(row: Dict):
-    try:
-        sheet.append_row([
-            row["name"],
-            row["email"],
-            row["github_url"]
-        ])
-    except Exception as e:
-        print(f"Google Sheets error: {e}")
+def flush_batch():
+    global BATCH_ROWS
 
+    if not BATCH_ROWS:
+        return
+
+    try:
+        sheet.append_rows(BATCH_ROWS, value_input_option="RAW")
+        print(f"✅ Flushed {len(BATCH_ROWS)} rows to Google Sheets")
+        BATCH_ROWS = []
+    except Exception as e:
+        print(f"❌ Google Sheets batch error: {e}")
+
+def append_to_sheet_batch(row: Dict):
+    global BATCH_ROWS
+
+    BATCH_ROWS.append([
+        row["name"],
+        row["email"],
+        row["github_url"]
+    ])
+
+    # Flush when batch full
+    if len(BATCH_ROWS) >= BATCH_SIZE:
+        flush_batch()
 
 def main():
     init_google_sheet()
@@ -501,6 +514,8 @@ def main():
 
     print(f"\n=== Done ===")
     print(f"Total users processed: {len(processed_usernames)}")
+
+    flush_batch()
 
 
 if __name__ == "__main__":
